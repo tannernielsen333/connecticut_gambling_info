@@ -36,6 +36,8 @@ df["year"] = df["month_year"].str.split().str[1]
 df = df.drop(columns=["month_ending", ":updated_at", ":created_at"])
 df = df[df["year"] != '2021']
 
+df.to_csv("data/clean.csv", index=False)
+
 ```
 
 # EDA
