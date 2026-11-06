@@ -1,0 +1,152 @@
+
+# Load In Data
+
+```{python}
+import requests
+import pandas as pd
+
+url = "https://data.ct.gov/api/v3/views/xf6g-659c/query.json"
+
+response = requests.get(url)
+response.raise_for_status()
+
+data = response.json()
+
+df = pd.DataFrame(data)
+df.to_csv("data/raw.csv", index=False)
+
+print(df.head())
+```
+
+# Clean Data
+
+```{python}
+import pandas as pd
+df = pd.read_csv("data/raw.csv")
+df = df.drop(":id", axis=1)
+df = df.drop(":version", axis=1)
+df = df.drop("notes", axis=1)
+
+
+df["month_ending"] = pd.to_datetime(df["month_ending"])
+df["month_year"] = df["month_ending"].dt.strftime("%B %Y")
+df["month"] = df["month_year"].str.split().str[0]
+df["year"] = df["month_year"].str.split().str[1]
+
+df = df.drop(columns=["month_ending", ":updated_at", ":created_at"])
+df = df[df["year"] != '2021']
+
+```
+
+# EDA
+
+```{python}
+import matplotlib.pyplot as plt
+import matplotlib.ticker as mtick
+# wager totals by year since 2021 - dataset only had last 3 months of 2021 (when sports wagering online launch in Connecticut)
+
+yearly = df.groupby("year")["wagers"].sum()
+
+yearly.plot(kind="bar", figsize=(10, 5))
+
+plt.title("Total Sports Wagers by Year")
+plt.xlabel("Year")
+plt.ylabel("Total Wagers ($)")
+
+plt.show()
+
+```
+
+```{python}
+plt.close()
+# visualizing the patrong wagers, patron winnings, and sportsbook profit 
+yearly = df.groupby("year")[[
+    "wagers",
+    "patron_winnings",
+    "online_sports_wagering_win"
+]].sum()
+
+yearly.plot(kind="bar", figsize=(12, 6))
+
+ax = yearly.plot(kind="bar", figsize=(12, 6))
+
+ax.yaxis.set_major_formatter(
+    mtick.FuncFormatter(lambda x, _: f'${x/1_000_000:.1f}M')
+)
+plt.title("Wagers, Total Winnings, & Sports Book Earnings")
+plt.legend(["Wagers", "Total Winnings", "Sports Book Net Earnings"])
+plt.savefig("wagers_and_winnings.png")
+
+print(df["wagers"].sum())
+
+```
+
+```{python}
+plt.close()
+# calculating the monthly average wager for each full year
+yearly_avg = df.groupby("year")["wagers"].mean()
+
+yearly_avg.plot(kind="bar", figsize=(10, 5))
+
+plt.title("Average Monthly Sports Wagers by Year")
+plt.xlabel("Year")
+plt.ylabel("Average Monthly Wagers ($)")
+plt.xticks(rotation=0)
+
+ax = yearly_avg.plot(kind="bar", figsize=(10, 5))
+
+ax.yaxis.set_major_formatter(
+    mtick.StrMethodFormatter('${x:,.0f}')
+)
+
+plt.ylabel("Average Monthly Wagers (USD)")
+plt.savefig("average_monthly.png")
+plt.show()
+```
+
+```{python}
+plt.close()
+# visualize total approved wagers by licensee
+
+licensee_sum = df.groupby("licensee")["wagers"].sum()
+
+ax = licensee_sum.plot(kind="bar", figsize=(10, 5))
+
+ax.set_title("Total Sports Wagers by Licensee")
+ax.set_xlabel("Licensee")
+ax.set_ylabel("Average Monthly Wagers (USD)")
+
+# Format y-axis
+ax.yaxis.set_major_formatter(
+    mtick.FuncFormatter(lambda x, _: f'${x/1_000_000:.1f}M')
+)
+
+plt.xticks(rotation=0)
+plt.tight_layout()
+plt.show()
+```
+
+# Summary Statistics
+
+```{python}
+
+def yearly_wagers(df):
+    yearly_totals = df.groupby("year")["wagers"].sum()
+
+    for year, total in yearly_totals.items():
+        if year != '2021':
+            print(f"{year}: ${total:,.2f}")
+
+yearly_wagers(df)
+
+def average_monthly_wagers(df):
+    yearly_averages = df.groupby("year")["wagers"].mean()
+
+    for year, average in yearly_averages.items():
+        if year != '2021':
+            print(f"{year}: ${average:,.2f}")
+
+    return yearly_averages
+
+average_monthly_wagers(df)
+```
